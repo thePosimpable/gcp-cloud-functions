@@ -30,22 +30,46 @@ def get_db():
 def main(request):
     db = get_db()
 
+    request_json = request.get_json()
+
     entryId = request.args.get('entryId')
     entryId = int(entryId) if entryId else entryId
 
     if entryId:
         query_string = """
-            DELETE FROM entries WHERE "entryId" = :entryId
-        """
+            INSERT INTO entries ("entryId", title, description, "startDate", "endDate", color, icon, "createdAt", "updatedAt")
+            VALUES ({entryId}, '{title}', '{description}', '{startDate}', '{endDate}', '{color}', '{icon}', '{createdAt}', '{updatedAt}')
+            ON CONFLICT ("entryId")
+            DO UPDATE SET
+                title = '{title}', 
+                description = '{description}',
+                "startDate" = '{startDate}',
+                "endDate" = '{endDate}',
+                color = '{color}',
+                icon = '{icon}',
+                "createdAt" = '{createdAt}',
+                "updatedAt" = '{updatedAt}'
+            ;
+        """.format(
+            entryId = entryId,
+            title = request_json['title'],
+            description = request_json['description'],
+            startDate = request_json['startDate'],
+            endDate = request_json['endDate'],
+            color = request_json['color'],
+            icon = request_json['icon'],
+            createdAt = request_json['createdAt'],
+            updatedAt = datetime.now()
+        )
 
         query = sqlalchemy.text(query_string)
         
         try:
             with db.connect() as conn:
-                db.execute(query, entryId = entryId)  
+                db.execute(query)  
                 return jsonify(success = True)
             
         except Exception as e:
             return 'Error: {}'.format(str(e))
-    
+        
     return "Record not found", 400
