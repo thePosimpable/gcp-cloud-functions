@@ -28,22 +28,26 @@ def get_db():
     return db
 
 def main(request):
-    request_json = request.get_json()
-    print(request_json)
+    print(request.args.get('entryId'))
 
     db = get_db()
 
-    query_string = """
-      SELECT * FROM entries;
-    """
+    entryId = request.args.get('entryId')
+    entryId = int(entryId) if entryId else entryId
 
-    query = sqlalchemy.text(query_string)
-    
-    try:
-        with db.connect() as conn:
-            conn.execute(query)
-            result_set = db.execute(query)  
-            return jsonify([dict(result) for result in result_set])
+    if entryId:
+        query_string = """
+            DELETE FROM entries WHERE "entryId" = :entryId
+        """
+
+        query = sqlalchemy.text(query_string)
         
-    except Exception as e:
-        return 'Error: {}'.format(str(e))
+        try:
+            with db.connect() as conn:
+                db.execute(query, entryId = entryId)  
+                return jsonify(success = True)
+            
+        except Exception as e:
+            return 'Error: {}'.format(str(e))
+    
+    return "Record not found", 400

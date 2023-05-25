@@ -28,22 +28,30 @@ def get_db():
     return db
 
 def main(request):
-    request_json = request.get_json()
-    print(request_json)
-
     db = get_db()
 
+    request_json = request.get_json()
+
     query_string = """
-      SELECT * FROM entries;
-    """
+        INSERT INTO entries (title, description, "startDate", "endDate", color, icon, "createdAt", "updatedAt")
+        VALUES ('{title}', '{description}', '{startDate}', '{endDate}', '{color}', '{icon}', '{createdAt}', '{updatedAt}');
+    """.format(
+        title = request_json['title'],
+        description = request_json['description'],
+        startDate = request_json['startDate'],
+        endDate = request_json['endDate'],
+        color = request_json['color'],
+        icon = request_json['icon'],
+        createdAt = datetime.now(),
+        updatedAt = datetime.now(),
+    )
 
     query = sqlalchemy.text(query_string)
     
     try:
         with db.connect() as conn:
-            conn.execute(query)
-            result_set = db.execute(query)  
-            return jsonify([dict(result) for result in result_set])
+            db.execute(query)  
+            return jsonify(success = True)
         
     except Exception as e:
         return 'Error: {}'.format(str(e))
