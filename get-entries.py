@@ -1,7 +1,20 @@
 import sqlalchemy
 import os
+import functions_framework
 from flask import jsonify
 from datetime import datetime
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
+def verify_token(request):
+    token = request.args.get('token') or None
+    try:
+        idinfo = id_token.verify_oauth2_token(token, requests.Request())
+        return True
+
+    except ValueError:
+        return False
+
 
 def get_db():
     connection_name = os.environ.get('CONNECTION_NAME')
@@ -10,6 +23,8 @@ def get_db():
     db_password = os.environ.get('DB_PASSWORD')
     driver_name = 'postgres+pg8000'
     qstring =  dict({"unix_sock": "/cloudsql/{}/.s.PGSQL.5432".format(connection_name)})
+
+    print(connection_name, db_name, db_user, db_password)
 
     db = sqlalchemy.create_engine(
         sqlalchemy.engine.url.URL(
@@ -27,9 +42,14 @@ def get_db():
 
     return db
 
+@functions_framework.http
 def main(request):
-    request_json = request.get_json()
-    print(request_json)
+    headers = {
+        'Access-Control-Allow-Origin': '*'
+    }
+
+    if not verify_token(request):
+        return ('unauthenticated', 401, headers)
 
     db = get_db()
 
@@ -37,13 +57,13 @@ def main(request):
       SELECT * FROM entries;
     """
 
-    query = sqlalchemy.text(query_string)
-    
+    query = sqlalchemy.text(query_string) 
+
     try:
         with db.connect() as conn:
-            conn.execute(query)
-            result_set = db.execute(query)  
-            return jsonify([dict(result) for result in result_set])
+            result_set = conn.execute(query)
+                
+            return (jsonify([dict(result) for result in result_set]), 200, headers)
         
     except Exception as e:
-        return 'Error: {}'.format(str(e))
+        return ('Error: {}'.format(str(e)), 400, headers)
