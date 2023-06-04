@@ -1,7 +1,22 @@
 import sqlalchemy
 import os
-from flask import jsonify
+import random
+import functions_framework
+import json
 from datetime import datetime
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
+
+def verify_token(request) -> bool:
+    token = request.args.get('token')
+    try:
+        idinfo = id_token.verify_oauth2_token(token, requests.Request())
+        return True
+
+    except ValueError:
+        return False
+
 
 def get_db():
     connection_name = os.environ.get('CONNECTION_NAME')
@@ -27,13 +42,39 @@ def get_db():
 
     return db
 
+def generate_random_color() -> str:
+    r = lambda: random.randint(0,255)
+    return '#%02X%02X%02X' % (r(),r(),r())
+
+@functions_framework.http
 def main(request):
+    # Set CORS headers for the preflight request
+    if request.method == 'OPTIONS':
+        # Allows GET requests from any origin with the Content-Type
+        # header and caches preflight response for an 3600s
+        headers = {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE',
+            'Access-Control-Allow-Headers': 'Content-Type',
+            'Access-Control-Max-Age': '3600'
+        }
+
+        return ('', 204, headers)
+
+    # Set CORS headers for the main request
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+    }
+
+    if not verify_token(request):
+        return ('unauthenticated', 401, headers)
+    
     db = get_db()
 
     request_json = request.get_json()
 
     entryId = request.args.get('entryId')
-    entryId = int(entryId) if entryId else entryId
 
     if entryId:
         query_string = """
@@ -56,7 +97,7 @@ def main(request):
             description = request_json['description'],
             startDate = request_json['startDate'],
             endDate = request_json['endDate'],
-            color = request_json['color'],
+            color = request_json['color'] if "color" in request_json and request_json['color'] else generate_random_color(),
             icon = request_json['icon'],
             createdAt = request_json['createdAt'],
             updatedAt = datetime.now()
@@ -67,9 +108,9 @@ def main(request):
         try:
             with db.connect() as conn:
                 db.execute(query)  
-                return jsonify(success = True)
+                return (f"successfully updated entry {entryId}", 200, headers)
             
         except Exception as e:
             return 'Error: {}'.format(str(e))
         
-    return "Record not found", 400
+    return ('Record not found'.format(str(e)), 400, headers)

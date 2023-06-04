@@ -69,12 +69,11 @@ def main(request):
     if not verify_token(request):
         return ('unauthenticated', 401, headers)
 
-
     db = get_db()
 
-    request_json = request.get_json()
+    request_json: dict = request.get_json()
 
-    query_string = """
+    query_string: str = """
         INSERT INTO entries (title, description, "startDate", "endDate", color, icon, "createdAt", "updatedAt")
         VALUES ('{title}', '{description}', '{startDate}', '{endDate}', '{color}', '{icon}', '{createdAt}', '{updatedAt}');
     """.format(
@@ -82,13 +81,13 @@ def main(request):
         description = request_json['description'],
         startDate = request_json['startDate'],
         endDate = request_json['endDate'],
-        color = (request_json['color'] if "color" in request_json else generate_random_color()),
+        color = (request_json['color'] if "color" in request_json and request_json['color'] else generate_random_color()),
         icon = request_json['icon'],
         createdAt = datetime.now(),
         updatedAt = datetime.now(),
     )
 
-    query = sqlalchemy.text(query_string)
+    query: sqlalchemy.text = sqlalchemy.text(query_string)
     
     try:
         with db.connect() as conn:
