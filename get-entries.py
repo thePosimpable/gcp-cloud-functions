@@ -6,13 +6,27 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 
 def verify_token(request):
+    source = request.args.get('source')
     token = request.args.get('token')
-    try:
-        idinfo = id_token.verify_oauth2_token(token, requests.Request())
-        return True
 
-    except ValueError:
+    if not source or not token:
         return False
+    
+    if source == "google":
+        try:
+            idinfo = id_token.verify_oauth2_token(token, requests.Request())
+            return True
+
+        except ValueError:
+            return False
+        
+    elif source == "firebase":
+        try:
+            idinfo = id_token.verify_firebase_token(token, requests.Request())
+            return True
+
+        except ValueError:
+            return False
 
 def get_db():
     connection_name = os.environ.get('CONNECTION_NAME')
@@ -51,7 +65,7 @@ def main(request):
     db = get_db()
 
     query_string = """
-      SELECT * FROM entries;
+      SELECT * FROM entries ORDER BY "createdAt" DESC;
     """
 
     query = sqlalchemy.text(query_string) 
